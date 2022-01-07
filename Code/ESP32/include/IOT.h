@@ -3,6 +3,7 @@
 #include "WiFi.h"
 #include "ArduinoJson.h"
 #include "IotWebConf.h"
+#include "IotWebConfUsing.h"
 
 #define STR_LEN 64    // general string buffer size
 #define CONFIG_LEN 32 // configuration string buffer size
