@@ -13,10 +13,10 @@ String baudSelectOptionsHtml;
 char _modbusPort[IOTWEBCONF_WORD_LEN];
 char _rtuBaudRate[IOTWEBCONF_WORD_LEN];
 char _modbusAddress[IOTWEBCONF_WORD_LEN];
-IotWebConfSeparator seperatorParam = IotWebConfSeparator("Modbus RTU");
-IotWebConfParameter modbusPortParam = IotWebConfParameter("TCP Modbus port", "modbusPortParam", _modbusPort, IOTWEBCONF_WORD_LEN, "number", NULL, "502");
-IotWebConfParameter modbusAddressParam = IotWebConfParameter("Modbus Address", "modbusAddressParam", _modbusAddress, IOTWEBCONF_WORD_LEN, "number", NULL, "10");
-IotWebConfParameter rtuBaudRateSelectParam = IotWebConfParameter(NULL, "baudSelector", _rtuBaudRate, IOTWEBCONF_WORD_LEN, "number", "0", "19200", SELECT_BAUD, true);
+iotwebconf::ParameterGroup groupParam = iotwebconf::ParameterGroup("Modbus RTU");
+iotwebconf::NumberParameter modbusPortParam = iotwebconf::NumberParameter("TCP Modbus port", "modbusPortParam", _modbusPort, IOTWEBCONF_WORD_LEN, "number", NULL, "502");
+iotwebconf::NumberParameter modbusAddressParam = iotwebconf::NumberParameter("Modbus Address", "modbusAddressParam", _modbusAddress, IOTWEBCONF_WORD_LEN, "number", NULL, "10");
+iotwebconf::NumberParameter rtuBaudRateSelectParam = iotwebconf::NumberParameter(NULL, "baudSelector", _rtuBaudRate, IOTWEBCONF_WORD_LEN, "number", "0", "19200", SELECT_BAUD, true);
 
 void WiFiEvent(WiFiEvent_t event)
 {
@@ -83,7 +83,7 @@ void handleRoot()
 	_webServer.send(200, "text/html", s);
 }
 
-boolean formValidator()
+boolean formValidator(iotwebconf::WebRequestWrapper* webRequestWrapper)
 {
 	boolean valid = true;
 
@@ -125,10 +125,10 @@ void IOT::Init()
 	}
 	WiFi.onEvent(WiFiEvent);
 	_iotWebConf.setupUpdateServer(&_httpUpdater);
-	_iotWebConf.addParameter(&seperatorParam);
-	_iotWebConf.addParameter(&modbusPortParam);
-	_iotWebConf.addParameter(&modbusAddressParam);
-	_iotWebConf.addParameter(&rtuBaudRateSelectParam);
+	groupParam.addItem(&modbusPortParam);
+	groupParam.addItem(&modbusAddressParam);
+	groupParam.addItem(&rtuBaudRateSelectParam);
+	_iotWebConf.addParameterGroup(&groupParam);
 	_iotWebConf.setFormValidator(&formValidator);
 	boolean validConfig = _iotWebConf.init();
 	if (!validConfig)
@@ -198,7 +198,7 @@ void IOT::Run()
 					logd("Setting password: %s", p->valueBuffer);
 					p = _iotWebConf.getApPasswordParameter();
 					strcpy(p->valueBuffer, TAG); // reset to default AP password
-					_iotWebConf.configSave();
+					_iotWebConf.saveConfig();
 					esp_restart(); // force reboot
 				}
 				else
