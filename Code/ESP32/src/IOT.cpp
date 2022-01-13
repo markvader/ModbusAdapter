@@ -2,12 +2,28 @@
 #include <EEPROM.h>
 #include "Log.h"
 
+#include <IotWebConfESP32HTTPUpdateServer.h>
+#include <IotWebConfTParameter.h>
+// Include Update server
+#ifdef ESP8266
+# include <ESP8266HTTPUpdateServer.h>
+#elif defined(ESP32)
+# include <IotWebConfESP32HTTPUpdateServer.h>
+#endif
+
 namespace ModbusAdapter
 {
 
 DNSServer _dnsServer;
 WebServer _webServer(80);
+
+// Create Update Server
+#ifdef ESP8266
+ESP8266HTTPUpdateServer _httpUpdater;
+#elif defined(ESP32)
 HTTPUpdateServer _httpUpdater;
+#endif
+
 IotWebConf _iotWebConf(TAG, &_dnsServer, &_webServer, TAG, CONFIG_VERSION);
 String baudSelectOptionsHtml;
 char _modbusPort[IOTWEBCONF_WORD_LEN];
@@ -16,7 +32,15 @@ char _modbusAddress[IOTWEBCONF_WORD_LEN];
 iotwebconf::ParameterGroup groupParam = iotwebconf::ParameterGroup("Modbus RTU");
 iotwebconf::NumberParameter modbusPortParam = iotwebconf::NumberParameter("TCP Modbus port", "modbusPortParam", _modbusPort, IOTWEBCONF_WORD_LEN, "number", NULL, "502");
 iotwebconf::NumberParameter modbusAddressParam = iotwebconf::NumberParameter("Modbus Address", "modbusAddressParam", _modbusAddress, IOTWEBCONF_WORD_LEN, "number", NULL, "10");
-iotwebconf::NumberParameter rtuBaudRateSelectParam = iotwebconf::NumberParameter(NULL, "baudSelector", _rtuBaudRate, IOTWEBCONF_WORD_LEN, "number", "0", "19200", SELECT_BAUD, true);
+iotwebconf::SelectTParameter<IOTWEBCONF_WORD_LEN> rtuBaudRateSelectParam =
+   iotwebconf::Builder<iotwebconf::SelectTParameter<IOTWEBCONF_WORD_LEN>>("rtuBaudRateSelectParam").
+   label("Choose param").
+   defaultValue("115200").
+   optionValues((const char*)_rtuBaudRate).
+   optionNames((const char*)_rtuBaudRate).
+   optionCount(sizeof(_rtuBaudRate) / IOTWEBCONF_WORD_LEN).
+   nameLength(IOTWEBCONF_WORD_LEN).
+   build();
 
 void WiFiEvent(WiFiEvent_t event)
 {
@@ -124,7 +148,9 @@ void IOT::Init()
 		logw("Factory Reset!");
 	}
 	WiFi.onEvent(WiFiEvent);
-	_iotWebConf.setupUpdateServer(&_httpUpdater);
+	_iotWebConf.setupUpdateServer(
+    [](const char* updatePath) { _httpUpdater.setup(&_webServer, updatePath); },
+    [](const char* userName, char* password) { _httpUpdater.updateCredentials(userName, password); });
 	groupParam.addItem(&modbusPortParam);
 	groupParam.addItem(&modbusAddressParam);
 	groupParam.addItem(&rtuBaudRateSelectParam);
@@ -190,7 +216,7 @@ void IOT::Run()
 			{
 				if (doc.containsKey("ssid") && doc.containsKey("password"))
 				{
-					IotWebConfParameter *p = _iotWebConf.getWifiSsidParameter();
+					iotwebconf::Parameter *p = _iotWebConf.getWifiSsidParameter();
 					strcpy(p->valueBuffer, doc["ssid"]);
 					logd("Setting ssid: %s", p->valueBuffer);
 					p = _iotWebConf.getWifiPasswordParameter();
